@@ -47,13 +47,22 @@ pub unsafe extern "system" fn wnd_graphics_proc(hwnd: HWND, msg: u32, wparam: WP
 pub struct Graphics {
     debug_controller: Option<ID3D12Debug>,
     dxgi_factory: Option<IDXGIFactory4>,
-    d3d12_device: Option<ID3D12Device>,
+    d3d_device: Option<ID3D12Device>,
+    descriptor_sizes: Option<DescriptorSizes>,
+    fence: Option<ID3D12Fence>,
+}
+
+struct DescriptorSizes {
+    cbv_srv_uav: u32,
+    rtv: u32,
+    dsv: u32,
 }
 
 impl Graphics {
     pub fn init(&mut self) -> Result<()> {
         unsafe {
             self.create_device()?;
+            self.create_fence_and_get_descriptor_sizes()?;
         }
         Ok(())
     }
@@ -70,17 +79,32 @@ impl Graphics {
         if let Err(_) = D3D12CreateDevice(
             None,
             D3D_FEATURE_LEVEL_11_0,
-            &mut self.d3d12_device,
+            &mut self.d3d_device,
         ) {
             // If failed, try to create WARP device (software renderer)
             let warp_adapter: Option<IDXGIAdapter> = Some(self.dxgi_factory.as_ref().unwrap().EnumWarpAdapter()?);
             D3D12CreateDevice(
                 warp_adapter.as_ref().unwrap(),
                 D3D_FEATURE_LEVEL_11_0,
-                &mut self.d3d12_device,
+                &mut self.d3d_device,
             )?;
         }
 
+        Ok(())
+    }
+
+    unsafe fn create_fence_and_get_descriptor_sizes(&mut self) -> Result<()> {
+        if let Some(device) = self.d3d_device.as_ref() {
+            self.fence = Some(device.CreateFence(0, D3D12_FENCE_FLAG_NONE)?);
+            self.descriptor_sizes = Some(
+                DescriptorSizes {
+                    cbv_srv_uav: device.GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV),
+                    rtv: device.GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV),
+                    dsv: device.GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV),
+                }
+            );
+                    
+        }
         Ok(())
     }
 }
