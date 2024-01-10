@@ -11,8 +11,10 @@ use windows::{
         },
     },
 };
-
+use std::sync::RwLock;
 use const_default::ConstDefault;
+
+pub static GRAPHICS: RwLock<Graphics> = RwLock::new(Graphics::DEFAULT);
 
 pub unsafe extern "system" fn wnd_graphics_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
@@ -27,6 +29,7 @@ pub unsafe extern "system" fn wnd_graphics_proc(hwnd: HWND, msg: u32, wparam: WP
                 let mut paint_struct = PAINTSTRUCT::default();
                 let hdc = BeginPaint(hwnd, &mut paint_struct);
                 let rect = paint_struct.rcPaint;
+                GRAPHICS.write().unwrap();
                 EndPaint(hwnd, &paint_struct);
                 LRESULT::default()
             }

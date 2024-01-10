@@ -1,13 +1,9 @@
 pub mod winapi_helper;
 pub mod graphics;
 
-use const_default::ConstDefault;
 use windows::core::*;
 use winapi_helper::*;
-use graphics::Graphics;
-use std::sync::RwLock;
-
-static GRAPHICS: RwLock<Graphics> = RwLock::new(Graphics::DEFAULT);
+use graphics::*;
 
 fn main() -> Result<()> {
     unsafe{
