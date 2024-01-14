@@ -52,6 +52,9 @@ pub struct Graphics {
     descriptor_sizes: Option<DescriptorSizes>,
     fence: Option<ID3D12Fence>,
     quality_4x_msaa: u32,
+    command_queue: Option<ID3D12CommandQueue>,
+    direct_cmd_list_alloc: Option<ID3D12CommandAllocator>,
+    command_list: Option<ID3D12GraphicsCommandList>,
 }
 
 struct DescriptorSizes {
@@ -66,6 +69,7 @@ impl Graphics {
             self.create_device()?;
             self.create_fence_and_get_descriptor_sizes()?;
             self.check_4x_msaa()?;
+            self.create_command_objects()?;
         }
         Ok(())
     }
@@ -127,6 +131,27 @@ impl Graphics {
             )?;
             self.quality_4x_msaa = ms_quality_levels.NumQualityLevels;
             assert!(self.quality_4x_msaa > 0, "Unexpected MSAA quality level.");
+        }
+        Ok(())
+    }
+
+    unsafe fn create_command_objects(&mut self) -> Result<()> {
+        if let Some(device) = self.d3d_device.as_ref() {
+            let queue_desc = D3D12_COMMAND_QUEUE_DESC {
+                Type: D3D12_COMMAND_LIST_TYPE_DIRECT,
+                Flags: D3D12_COMMAND_QUEUE_FLAG_NONE,
+                ..Default::default()
+            };
+            self.command_queue = Some(device.CreateCommandQueue(&queue_desc)?);
+            self.direct_cmd_list_alloc = Some(device.CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT)?);
+            self.command_list = Some(device.CreateCommandList(
+                0,
+                D3D12_COMMAND_LIST_TYPE_DIRECT,
+                self.direct_cmd_list_alloc.as_ref().unwrap(),
+                None,
+            )?);
+            // 처음에는 닫아야 한다. 최초 reset을 진행하려면 닫혀 있어야 한다.
+            self.command_list.as_ref().unwrap().Close()?;
         }
         Ok(())
     }
