@@ -53,6 +53,8 @@ pub struct Graphics {
     direct_cmd_list_alloc: Option<ID3D12CommandAllocator>,
     command_list: Option<ID3D12GraphicsCommandList>,
     swapchain: Option<IDXGISwapChain>,
+    rtv_heap: Option<ID3D12DescriptorHeap>,
+    dsv_heap: Option<ID3D12DescriptorHeap>,
 }
 
 struct DescriptorSizes {
@@ -71,6 +73,7 @@ impl Graphics {
             self.check_4x_msaa()?;
             self.create_command_objects()?;
             self.create_swapchain(hwnd)?;
+            self.create_rtv_and_dsv_descriptor_heaps()?;
         }
         Ok(())
     }
@@ -196,6 +199,28 @@ impl Graphics {
         if let Some(dxgi_factory) = self.dxgi_factory.as_ref() {
             dxgi_factory.CreateSwapChain(self.command_queue.as_ref().expect("no command queue when create swapchain"), &swapchain_desc as *const _, &self.swapchain as *const _ as *mut _).ok()?;
         }
+        Ok(())
+    }
+
+    unsafe fn create_rtv_and_dsv_descriptor_heaps(&mut self) -> Result<()> {
+        let rtv_heap_desc = D3D12_DESCRIPTOR_HEAP_DESC {
+            Type: D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+            NumDescriptors: 2,
+            Flags: D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+            ..Default::default()
+        };
+
+        let dsv_heap_desc = D3D12_DESCRIPTOR_HEAP_DESC {
+            Type: D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+            NumDescriptors: 1,
+            Flags: D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+            ..Default::default()
+        };
+
+        if let Some(device) = self.d3d_device.as_ref(){
+            self.rtv_heap = Some(device.CreateDescriptorHeap::<ID3D12DescriptorHeap>(&rtv_heap_desc as *const _)?);
+            self.dsv_heap = Some(device.CreateDescriptorHeap::<ID3D12DescriptorHeap>(&dsv_heap_desc as *const _)?);
+        };
         Ok(())
     }
 }
