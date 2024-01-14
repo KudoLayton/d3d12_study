@@ -14,7 +14,7 @@ fn main() -> Result<()> {
         let window_title = w!("d3d12 Sample");
         create_wnd_class(&class_name, Some(graphics::wnd_graphics_proc))?;
         let hwnd = create_wnd(&class_name, &window_title, WIDTH as i32, HEIGHT as i32)?;
-        let _ = GRAPHICS.write().unwrap().init(hwnd, WIDTH, HEIGHT)?;
+        GRAPHICS.write().unwrap().init(hwnd, WIDTH, HEIGHT)?;
         run_wnd(&hwnd)?;
     }
     Ok(())
