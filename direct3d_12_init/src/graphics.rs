@@ -40,15 +40,19 @@ pub unsafe extern "system" fn wnd_graphics_proc(hwnd: HWND, msg: u32, wparam: WP
 //set default value of struct
 #[derive(ConstDefault)]
 pub struct Graphics {
+    width: u32,
+    height: u32,
     debug_controller: Option<ID3D12Debug>,
     dxgi_factory: Option<IDXGIFactory4>,
     d3d_device: Option<ID3D12Device>,
     descriptor_sizes: Option<DescriptorSizes>,
     fence: Option<ID3D12Fence>,
     quality_4x_msaa: u32,
+    state_4x_msaa: bool,
     command_queue: Option<ID3D12CommandQueue>,
     direct_cmd_list_alloc: Option<ID3D12CommandAllocator>,
     command_list: Option<ID3D12GraphicsCommandList>,
+    swapchain: Option<IDXGISwapChain>,
 }
 
 struct DescriptorSizes {
@@ -58,12 +62,15 @@ struct DescriptorSizes {
 }
 
 impl Graphics {
-    pub fn init(&mut self) -> Result<()> {
+    pub fn init(&mut self, hwnd:HWND, width: u32, height: u32) -> Result<()> {
         unsafe {
+            self.width = width;
+            self.height = height;
             self.create_device()?;
             self.create_fence_and_get_descriptor_sizes()?;
             self.check_4x_msaa()?;
             self.create_command_objects()?;
+            self.create_swapchain(hwnd)?;
         }
         Ok(())
     }
@@ -146,6 +153,48 @@ impl Graphics {
             )?);
             // 처음에는 닫아야 한다. 최초 reset을 진행하려면 닫혀 있어야 한다.
             self.command_list.as_ref().unwrap().Close()?;
+        }
+        Ok(())
+    }
+
+    unsafe fn create_swapchain(&mut self, hwnd: HWND) -> Result<()> {
+        let buffer_desc = DXGI_MODE_DESC {
+            Width: self.width,
+            Height: self.height,
+            RefreshRate: DXGI_RATIONAL {
+                Numerator: 60,
+                Denominator: 1,
+            },
+            Format: BACK_BUFFER_FORMAT,
+            ScanlineOrdering: DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED,
+            Scaling: DXGI_MODE_SCALING_UNSPECIFIED,
+            ..Default::default()
+        };
+
+        let sample_desc = match self.state_4x_msaa {
+            true => DXGI_SAMPLE_DESC {
+                Count: 4,
+                Quality: self.quality_4x_msaa - 1,
+            },
+            false => DXGI_SAMPLE_DESC {
+                Count: 1,
+                Quality: 0,
+            },
+        };
+
+        let swapchain_desc = DXGI_SWAP_CHAIN_DESC {
+            BufferDesc: buffer_desc,
+            SampleDesc: sample_desc,
+            BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
+            BufferCount: 2,
+            OutputWindow: hwnd,
+            Windowed: TRUE,
+            SwapEffect: DXGI_SWAP_EFFECT_FLIP_DISCARD,
+            Flags: DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH.0 as u32,
+        };
+
+        if let Some(dxgi_factory) = self.dxgi_factory.as_ref() {
+            dxgi_factory.CreateSwapChain(self.command_queue.as_ref().expect("no command queue when create swapchain"), &swapchain_desc as *const _, &self.swapchain as *const _ as *mut _).ok()?;
         }
         Ok(())
     }
