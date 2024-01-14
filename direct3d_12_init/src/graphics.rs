@@ -6,7 +6,7 @@ use windows::{
         Graphics::{
             Direct3D::*,
             Direct3D12::*,
-            Dxgi::*,
+            Dxgi::{*, Common::*},
             Gdi::*
         },
     },
@@ -15,6 +15,7 @@ use std::sync::RwLock;
 use const_default::ConstDefault;
 
 pub static GRAPHICS: RwLock<Graphics> = RwLock::new(Graphics::DEFAULT);
+static BACK_BUFFER_FORMAT: DXGI_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
 
 pub unsafe extern "system" fn wnd_graphics_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
@@ -50,6 +51,7 @@ pub struct Graphics {
     d3d_device: Option<ID3D12Device>,
     descriptor_sizes: Option<DescriptorSizes>,
     fence: Option<ID3D12Fence>,
+    quality_4x_msaa: u32,
 }
 
 struct DescriptorSizes {
@@ -63,6 +65,7 @@ impl Graphics {
         unsafe {
             self.create_device()?;
             self.create_fence_and_get_descriptor_sizes()?;
+            self.check_4x_msaa()?;
         }
         Ok(())
     }
@@ -104,6 +107,26 @@ impl Graphics {
                 }
             );
                     
+        }
+        Ok(())
+    }
+
+    unsafe fn check_4x_msaa(&mut self) -> Result<()> {
+        let ms_quality_levels = D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS {
+            Format: BACK_BUFFER_FORMAT,
+            SampleCount: 4,
+            Flags: D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE,
+            NumQualityLevels: 0,
+        };
+
+        if let Some(device) = self.d3d_device.as_ref() { 
+            device.CheckFeatureSupport(
+                D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
+                &ms_quality_levels as *const _ as *mut _,
+                std::mem::size_of::<D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS>() as u32,
+            )?;
+            self.quality_4x_msaa = ms_quality_levels.NumQualityLevels;
+            assert!(self.quality_4x_msaa > 0, "Unexpected MSAA quality level.");
         }
         Ok(())
     }
