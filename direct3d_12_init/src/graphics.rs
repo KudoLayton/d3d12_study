@@ -20,25 +20,19 @@ static BACK_BUFFER_FORMAT: DXGI_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
 pub unsafe extern "system" fn wnd_graphics_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_DESTROY => {
-            unsafe{
-                PostQuitMessage(0);
-                LRESULT::default()
-            }
+            PostQuitMessage(0);
+            LRESULT::default()
         },
         WM_PAINT => {
-            unsafe{
-                let mut paint_struct = PAINTSTRUCT::default();
-                let hdc = BeginPaint(hwnd, &mut paint_struct);
-                let rect = paint_struct.rcPaint;
-                GRAPHICS.write().unwrap();
-                EndPaint(hwnd, &paint_struct);
-                LRESULT::default()
-            }
+            let mut paint_struct = PAINTSTRUCT::default();
+            let hdc = BeginPaint(hwnd, &mut paint_struct);
+            let rect = paint_struct.rcPaint;
+            let graphics = GRAPHICS.write().unwrap();
+            EndPaint(hwnd, &paint_struct);
+            LRESULT::default()
         },
         _ => {
-            unsafe{
-                DefWindowProcW(hwnd, msg, wparam, lparam)
-            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
         }
     }
 }
